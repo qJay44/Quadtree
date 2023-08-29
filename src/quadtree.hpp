@@ -7,15 +7,29 @@ struct Point {
 };
 
 struct Rectangle {
-  // As the center of a rectangle
+  // NOTE: Coords must point to the center of a rectangle
   float x, y, w, h;
 
-  bool isInBoundary(Point p) {
+  float top    = y - h;
+  float right  = x + w;
+  float bottom = y + h;
+  float left   = x - w;
+
+  bool contains(const Point& p) const {
     return (
       p.x >= x - w &&
       p.x <= x + w &&
       p.y >= y - h &&
       p.y <= y + h
+    );
+  }
+
+  bool intersects(const Rectangle& r) const {
+    return (
+      top    < r.bottom ||
+      right  < r.left   ||
+      left   > r.right  ||
+      bottom > r.top
     );
   }
 };
@@ -66,7 +80,7 @@ class QuadTree {
     }
 
     bool insert(Point p) {
-      if (!boundary.isInBoundary(p)) return false;
+      if (!boundary.contains(p)) return false;
 
       if (points.size() < capacity) {
         points.push_back(p);
@@ -81,6 +95,21 @@ class QuadTree {
         ) return true;
         else
           throw std::runtime_error("The point somehow didn't inserted in any quad");
+      }
+    }
+
+    void query(std::vector<Point>& found, const Rectangle& range) {
+      if (boundary.intersects(range)) {
+        for (const Point& p : points)
+          if (range.contains(p))
+            found.push_back(p);
+      }
+
+      if (divided) {
+        northWest->query(found, range);
+        northEast->query(found, range);
+        southWest->query(found, range);
+        southEast->query(found, range);
       }
     }
 
