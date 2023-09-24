@@ -25,11 +25,12 @@ struct Rectangle {
   }
 
   bool intersects(const Rectangle& r) const {
-    return (
-      top    < r.bottom ||
-      right  < r.left   ||
-      left   > r.right  ||
-      bottom > r.top
+    return !(
+      // Checking given rectangle is it off the quad by each side
+      top    > r.bottom || // True: The rectangle under the current quad
+      right  < r.left   || // True: The rectangle to the right of the current quad
+      left   > r.right  || // True: The rectangle to the lefft the current quad
+      bottom < r.top       // True: The rectangle above the current quad
     );
   }
 };
