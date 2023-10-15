@@ -27,9 +27,7 @@ class App {
       vertices[1].color = this->color;
       vertices[2].color = this->color;
       vertices[3].color = this->color;
-    }
 
-    void update() {
       vertices[0].position = pos;
       vertices[1].position = {pos.x + size.x, pos.y};
       vertices[2].position = {pos.x + size.x, pos.y + size.y};
@@ -45,11 +43,15 @@ class App {
   sf::View viewStatic;
   sf::Text countText;
   sf::Text drawTimeText;
+  sf::Text modeText;
 
   std::vector<SomeObjectWithArea> vecObjects;
+  StaticQuadTree<SomeObjectWithArea> quadtree;
   const float area = 100000.f;
   const float zoomFactor = 0.3f;
   float dragFactor = 1.2f;
+
+  bool usingQuadTree = false;
 
   void setupSFML() {
     // Setup main window
@@ -67,13 +69,21 @@ class App {
     countText.setOutlineThickness(3.f);
     countText.setPosition({0.f, 0.f});
 
-    // Rectangles draw count text setup
+    // Draw time text setup
     drawTimeText.setString("1000 ms");
     drawTimeText.setFont(genericFont);
     drawTimeText.setCharacterSize(20);
     drawTimeText.setOutlineColor(sf::Color(31, 31, 31));
     drawTimeText.setOutlineThickness(3.f);
     drawTimeText.setPosition({0.f , countText.getLocalBounds().height + 10.f});
+
+    // Draw time text setup
+    modeText.setString("Linear");
+    modeText.setFont(genericFont);
+    modeText.setCharacterSize(20);
+    modeText.setOutlineColor(sf::Color(31, 31, 31));
+    modeText.setOutlineThickness(3.f);
+    modeText.setPosition({0.f , drawTimeText.getPosition().y + drawTimeText.getLocalBounds().height + 10.f});
 
     view.setSize(WIDTH, HEIGHT);
     view.setCenter(WIDTH / 2.f, HEIGHT / 2.f);
@@ -84,6 +94,7 @@ class App {
 
   void setupProgram() {
     srand((unsigned)time(NULL));
+    quadtree.resize(qt::Rectangle({0.f, 0.f}, {area, area}));
 
     for (int i = 0; i < 1e6; i++) {
       SomeObjectWithArea obj(
@@ -92,7 +103,9 @@ class App {
         {random(0.1f, 100.f), random(0.1f, 100.f)},
         sf::Color(rand() % 256, rand() % 256, rand() % 256)
       );
+
       vecObjects.push_back(obj);
+      quadtree.insert(obj, qt::Rectangle(obj.pos, obj.size));
     }
   }
 
@@ -105,11 +118,6 @@ class App {
     dragFactor *= diff;
   }
 
-  void updateObjects() {
-    for (SomeObjectWithArea& obj : vecObjects)
-      obj.update();
-  }
-
   void updateView() {
     view.move((mousePressed - mouse) * dragFactor);
     mousePressed = mouse;
@@ -118,18 +126,30 @@ class App {
 
   void draw() {
     sf::VertexArray vertices{sf::Quads};
-    Rectangle screen = {view.getCenter() - view.getSize() / 2.f, view.getSize()};
+    qt::Rectangle screen = {view.getCenter() - view.getSize() / 2.f, view.getSize()};
 
     int count = 0;
     sf::Clock clock;
-    for (const SomeObjectWithArea& obj : vecObjects)
-      if (screen.overlaps({obj.pos, obj.size})) {
+
+    if (usingQuadTree) {
+      for (const SomeObjectWithArea& obj : quadtree.search(screen)) {
         for (int i = 0; i < 4; i++)
           vertices.append(obj.vertices[i]);
         count++;
       }
+      modeText.setString("Quad Tree");
+    } else {
+      for (const SomeObjectWithArea& obj : vecObjects)
+        if (screen.overlaps({obj.pos, obj.size})) {
+          for (int i = 0; i < 4; i++)
+            vertices.append(obj.vertices[i]);
+          count++;
+        }
 
-    drawTimeText.setString("Draw time: " + std::to_string(clock.restart().asMilliseconds()) + " ms");
+      modeText.setString("Linear");
+    }
+
+    drawTimeText.setString("Draw time: " + std::to_string(clock.restart().asSeconds()) + " sec");
     countText.setString("Count: " + std::to_string(count) + " / " + std::to_string(vecObjects.size()));
 
     window.draw(vertices);
@@ -137,6 +157,7 @@ class App {
     window.setView(viewStatic);
     window.draw(countText);
     window.draw(drawTimeText);
+    window.draw(modeText);
   }
 
   public:
@@ -161,6 +182,9 @@ class App {
               case sf::Keyboard::Q:
                 window.close();
                 break;
+              case sf::Keyboard::Tab:
+                usingQuadTree = !usingQuadTree;
+                break;
               default:
                 break;
             }
@@ -183,7 +207,6 @@ class App {
         if (!sf::Mouse::isButtonPressed(sf::Mouse::Left))
           mousePressed = mouse;
 
-        updateObjects();
         updateView();
 
         window.clear();
