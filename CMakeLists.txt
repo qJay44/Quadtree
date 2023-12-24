@@ -17,8 +17,9 @@ include_directories(${MY_UTILS_PATH})
 
 add_executable(MyProject
   ${SRC_DIR}main.cpp
-  ${MY_UTILS_PATH}myutils.cpp
 )
+
+target_precompile_headers(${PROJECT_NAME} PUBLIC ${SRC_DIR}pch.h)
 
 target_link_libraries(MyProject sfml-system sfml-window sfml-graphics)
 

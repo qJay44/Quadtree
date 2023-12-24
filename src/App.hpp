@@ -1,9 +1,4 @@
-#include "SFML/System.hpp"
-#include "SFML/Window.hpp"
-#include "myutils.hpp"
 #include "quadtree.hpp"
-#include <stdlib.h>
-#include <vector>
 
 #define WIDTH 800
 #define HEIGHT 800
@@ -11,26 +6,21 @@
 class App {
   sf::RenderWindow window;
   sf::Font genericFont;
-
-  Rectangle* boundary;
-  QuadTree* qt;
+  Node* qt;
 
   float mouseX, mouseY;
 
   void setupSFML() {
     // Setup main window
-    window.create(sf::VideoMode(WIDTH, HEIGHT), "Template text", sf::Style::Close);
-    window.setFramerateLimit(75);
+    window.create(sf::VideoMode(WIDTH, HEIGHT), "Quad tree", sf::Style::Close);
+    window.setFramerateLimit(90);
 
     // Font for some test text
     genericFont.loadFromFile("../../src/fonts/Minecraft rus.ttf");
   }
 
   void setupProgram() {
-    srand((unsigned)time(NULL));
-
-    boundary = new Rectangle{WIDTH / 2.f, HEIGHT / 2.f, WIDTH / 2.f, HEIGHT / 2.f};
-    qt = new QuadTree(*boundary, 4);
+    qt = new Node({WIDTH / 2.f, HEIGHT / 2.f, WIDTH / 2.f, HEIGHT / 2.f});
   }
 
   void draw() {
@@ -44,14 +34,14 @@ class App {
     rect.setOutlineColor(sf::Color::Green);
     rect.setOutlineThickness(1.f);
 
-    std::vector<Point> found;
+    std::list<const Point*> found;
     qt->query(found, range);
 
-    for (const Point& p : found) {
-        sf::CircleShape c(2.f);
-        c.setPosition(p.x, p.y);
-        c.setFillColor(sf::Color::Green);
-        window.draw(c);
+    for (const Point* p : found) {
+      sf::CircleShape c(2.f);
+      c.setPosition(p->x, p->y);
+      c.setFillColor(sf::Color::Green);
+      window.draw(c);
     }
 
     window.draw(rect);
@@ -61,7 +51,6 @@ class App {
     App() {}
 
     ~App() {
-      delete boundary;
       delete qt;
     }
 

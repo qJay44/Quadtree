@@ -1,6 +1,7 @@
-#include "SFML/Graphics.hpp"
-#include <stdexcept>
-#include <vector>
+#include <list>
+#include "pch.h"
+
+#define CAPACITY 4
 
 struct Point {
   float x, y;
@@ -16,12 +17,11 @@ struct Rectangle {
   float left   = x - w;
 
   bool contains(const Point& p) const {
-    return (
-      p.x >= x - w &&
-      p.x <= x + w &&
-      p.y >= y - h &&
-      p.y <= y + h
-    );
+    return
+      p.x >= left  &&
+      p.x <= right &&
+      p.y >= top   &&
+      p.y <= bottom;
   }
 
   bool intersects(const Rectangle& r) const {
@@ -29,51 +29,48 @@ struct Rectangle {
       // Checking given rectangle is it off the quad by each side
       top    > r.bottom || // True: The rectangle under the current quad
       right  < r.left   || // True: The rectangle to the right of the current quad
-      left   > r.right  || // True: The rectangle to the lefft the current quad
+      left   > r.right  || // True: The rectangle to the left the current quad
       bottom < r.top       // True: The rectangle above the current quad
     );
   }
 };
 
-class QuadTree {
+class Node {
   Rectangle boundary;
-  int capacity;
-  std::vector<Point> points;
+  std::list<Point> points;
   bool divided = false;
 
-  QuadTree* northWest = nullptr;
-  QuadTree* northEast = nullptr;
-  QuadTree* southWest = nullptr;
-  QuadTree* southEast = nullptr;
+  Node* northWest = nullptr;
+  Node* northEast = nullptr;
+  Node* southWest = nullptr;
+  Node* southEast = nullptr;
 
   void subdivide() {
-    if (divided) return;
-    divided = true;
+    if (!divided) {
+      const float& x = boundary.x;
+      const float& y = boundary.y;
+      const float& w = boundary.w;
+      const float& h = boundary.h;
 
-    float& x = boundary.x;
-    float& y = boundary.y;
-    float& w = boundary.w;
-    float& h = boundary.h;
+      Rectangle nwRect{x - w / 2.f, y - h / 2.f, w / 2.f, h / 2.f};
+      Rectangle neRect{x + w / 2.f, y - h / 2.f, w / 2.f, h / 2.f};
+      Rectangle swRect{x - w / 2.f, y + h / 2.f, w / 2.f, h / 2.f};
+      Rectangle seRect{x + w / 2.f, y + h / 2.f, w / 2.f, h / 2.f};
 
-    Rectangle nwRect{x - w / 2, y - h / 2, w / 2, h / 2};
-    Rectangle neRect{x + w / 2, y - h / 2, w / 2, h / 2};
-    Rectangle swRect{x - w / 2, y + h / 2, w / 2, h / 2};
-    Rectangle seRect{x + w / 2, y + h / 2, w / 2, h / 2};
+      northWest = new Node(nwRect);
+      northEast = new Node(neRect);
+      southWest = new Node(swRect);
+      southEast = new Node(seRect);
 
-    northWest = new QuadTree(nwRect, capacity);
-    northEast = new QuadTree(neRect, capacity);
-    southWest = new QuadTree(swRect, capacity);
-    southEast = new QuadTree(seRect, capacity);
+      divided = true;
+    }
   }
 
   public:
 
-    QuadTree(Rectangle boundary, int capacity)
-      : boundary(boundary), capacity(capacity) {
-        points.reserve(capacity);
-    }
+    Node(Rectangle boundary) : boundary(boundary) {}
 
-    ~QuadTree() {
+    ~Node() {
       delete northWest;
       delete northEast;
       delete southWest;
@@ -83,54 +80,52 @@ class QuadTree {
     bool insert(Point p) {
       if (!boundary.contains(p)) return false;
 
-      if (points.size() < capacity) {
+      if (points.size() < CAPACITY) {
         points.push_back(p);
         return true;
       } else {
         subdivide();
-        if (
+        return
           northWest->insert(p) ||
           northEast->insert(p) ||
           southWest->insert(p) ||
-          southEast->insert(p)
-        ) return true;
-        else
-          throw std::runtime_error("The point somehow didn't inserted in any quad");
+          southEast->insert(p);
       }
     }
 
-    void query(std::vector<Point>& found, const Rectangle& range) {
+    void query(std::list<const Point*>& found, const Rectangle& range) {
       if (boundary.intersects(range)) {
         for (const Point& p : points)
           if (range.contains(p))
-            found.push_back(p);
-      }
+            found.push_back(&p);
 
-      if (divided) {
-        northWest->query(found, range);
-        northEast->query(found, range);
-        southWest->query(found, range);
-        southEast->query(found, range);
+        if (divided) {
+          northWest->query(found, range);
+          northEast->query(found, range);
+          southWest->query(found, range);
+          southEast->query(found, range);
+        }
       }
     }
 
     void show(sf::RenderWindow& win) {
-      float& x = boundary.x;
-      float& y = boundary.y;
-      float& w = boundary.w;
-      float& h = boundary.h;
+      static const sf::Color color{30, 30, 30};
+      const float& x = boundary.x;
+      const float& y = boundary.y;
+      const float& w = boundary.w;
+      const float& h = boundary.h;
 
       sf::Vertex lineVertical[] = {
-        sf::Vertex({x, y - h}),
-        sf::Vertex({x, y + h})
+        sf::Vertex({x, y - h}, color),
+        sf::Vertex({x, y + h}, color)
       };
 
       sf::Vertex lineHorizontal[] = {
-        sf::Vertex({x - w, y}),
-        sf::Vertex({x + w, y})
+        sf::Vertex({x - w, y}, color),
+        sf::Vertex({x + w, y}, color)
       };
 
-      for (Point p : points) {
+      for (const Point& p : points) {
         sf::CircleShape c(1.f);
         c.setPosition(p.x, p.y);
         win.draw(c);

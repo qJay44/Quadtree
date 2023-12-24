@@ -1,3 +1,6 @@
+@echo off
+clear
+
 Rem Build
 if not exist Build\Debug mkdir Build\Debug
 cd Build\Debug
